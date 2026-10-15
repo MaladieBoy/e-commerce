@@ -1,59 +1,35 @@
-
 pipeline {
     agent any
 
-    tools {
-        jdk 'JDK21'
-        maven 'maven3.6.3'
-    }
-
     environment {
-        TOMCAT_URL = 'http://localhost:8080'
-        TOMCAT_CREDENTIALS = 'tomcat'
+        JAVA_HOME  = '/usr/lib/jvm/java-21-openjdk-amd64'
+        MAVEN_HOME = '/usr/local/src/maven'
+        PATH       = "${MAVEN_HOME}/bin:${JAVA_HOME}/bin:${env.PATH}"
     }
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                git branch: 'master',
-                    url: 'https://github.com/marwaiset/e-commerce.git'
-            }
-        }
-
         stage('Build') {
             steps {
                 sh 'mvn clean package'
             }
         }
 
-        stage('Test') {
+        stage('Deploy') {
             steps {
-                sh 'mvn test'
+                sh 'cp target/e-commerce.war /opt/tomcat/latest/webapps/'
             }
         }
 
-        stage('Deploy to Tomcat') {
+        stage('Verify') {
             steps {
-                deploy adapters: [
-                    tomcat9(
-                        credentialsId: "${TOMCAT_CREDENTIALS}",
-                        path: '',
-                        url: "${TOMCAT_URL}"
-                    )
-                ],
-                contextPath: 'e-commerce',
-                war: 'target/*.war'
+                sh 'sleep 15'
+                sh 'curl -fsL -o /dev/null -w "HTTP %{http_code}\\n" http://localhost:8080/e-commerce/'
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Déploiement réussi sur Tomcat'
-        }
-        failure {
-            echo '❌ Échec de la pipeline'
-        }
+        success { echo 'Deployed: http://localhost:8080/e-commerce' }
+        failure { echo 'Pipeline failed, check the stage that turned red.' }
     }
 }
